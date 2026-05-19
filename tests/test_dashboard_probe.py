@@ -144,12 +144,12 @@ def test_status_honors_never_and_external_browser_link_without_probe(monkeypatch
         "enabled": "never",
     }
 
-    result = dashboard_probe.get_dashboard_status(config_data={"webui": {"dashboard": {"enabled": "always", "url": "https://hermes-official.zyrin.co"}}})
+    result = dashboard_probe.get_dashboard_status(config_data={"webui": {"dashboard": {"enabled": "always", "url": "https://dashboard.example.test"}}})
     assert result == {
         "running": True,
         "enabled": "always",
-        "url": "https://hermes-official.zyrin.co",
-        "browser_url": "https://hermes-official.zyrin.co",
+        "url": "https://dashboard.example.test",
+        "browser_url": "https://dashboard.example.test",
     }
 
 
@@ -207,9 +207,9 @@ def test_dashboard_config_roundtrip_writes_profile_config_yaml(tmp_path, monkeyp
     assert saved == {"enabled": "auto", "url": "http://127.0.0.1:19119"}
     assert "dashboard:" in (tmp_path / "config.yaml").read_text(encoding="utf-8")
 
-    saved = save_dashboard_config({"enabled": "always", "url": "https://hermes-official.zyrin.co"})
-    assert saved == {"enabled": "always", "url": "https://hermes-official.zyrin.co"}
-    assert get_dashboard_config() == {"enabled": "always", "url": "https://hermes-official.zyrin.co"}
+    saved = save_dashboard_config({"enabled": "always", "url": "https://dashboard.example.test"})
+    assert saved == {"enabled": "always", "url": "https://dashboard.example.test"}
+    assert get_dashboard_config() == {"enabled": "always", "url": "https://dashboard.example.test"}
 
     for unsafe_url in ("https://example.com/path", "https://user:pass@example.com", "javascript:alert(1)"):
         try:
