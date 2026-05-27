@@ -6,6 +6,13 @@
 ### Fixed
 
 - Live streamed assistant Markdown now treats underscores in ordinary text and identifiers literally, matching the settled message renderer while preserving asterisk-based emphasis.
+- Models cache no longer churns every ~14 minutes when the auth.json credential pool refreshes. The auth.json fingerprint now hashes provider-identity fields (active_provider, credential_pool ids, base_url, auth_type) and excludes pure credential-rotation fields (access_token, refresh_token, expires_at, last_status, request_count, updated_at). Real provider/model-set changes still invalidate the cache. (RCA t_16551f61)
+- Paginated `/api/session?msg_limit=N` windows now anchor on the newest renderable transcript row instead of the raw message-array tail. Long sessions whose newest rows are only hidden tool-result entries no longer open to an empty visible transcript with non-empty `S.messages`.
+- `_loadOlderMessages()` now requests a larger cumulative tail window (`msg_limit=current+30`) rather than a separate `msg_before` page. Suffix-continuity check guards against races and falls back to the legacy index-page request when the loaded transcript is no longer the suffix of the new server response.
+
+### Performance
+
+- `renderMessages()` now caches `renderMd()` / `_renderUserFencedBlocks()` output keyed on message text, caches the visible-message scan across renders, scopes the question→assistant lookup to the visible window, and Prism-highlights only newly-mounted code blocks. Long sessions with many messages no longer freeze the browser tab on every render.
 
 ## [v0.51.139] — 2026-05-25 — Release DK (stage-batch21 — 5-PR tier-2 batch)
 
