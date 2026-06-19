@@ -2635,12 +2635,20 @@ function _kanbanResetTaskModalFields(values){
 function _kanbanSetTaskModalLabels(mode){
   const titleH = document.getElementById('kanbanTaskModalTitle');
   const submitBtn = document.getElementById('kanbanTaskModalSubmit');
+  const workspaceKindEl = document.getElementById('kanbanTaskModalWorkspaceKind');
+  const workspacePathEl = document.getElementById('kanbanTaskModalWorkspacePath');
   if (mode === 'edit') {
     if (titleH) titleH.textContent = t('kanban_edit_task') || 'Edit task';
     if (submitBtn) submitBtn.textContent = t('save') || 'Save';
+    // Disable workspace fields during edit since they are not handled by the backend
+    if (workspaceKindEl) workspaceKindEl.disabled = true;
+    if (workspacePathEl) workspacePathEl.disabled = true;
   } else {
     if (titleH) titleH.textContent = t('kanban_new_task') || 'New task';
     if (submitBtn) submitBtn.textContent = t('create') || 'Create';
+    // Enable workspace fields during create
+    if (workspaceKindEl) workspaceKindEl.disabled = false;
+    if (workspacePathEl) workspacePathEl.disabled = false;
   }
 }
 
@@ -2792,8 +2800,8 @@ async function submitKanbanTaskModal(){
     }
     const n = parseInt(priorityRaw, 10);
     payload.priority = Number.isNaN(n) ? 0 : n;
-    payload.workspace_kind = workspaceKind;
-    if (workspacePathVal) payload.workspace_path = workspacePathVal;
+    // Note: workspace_kind and workspace_path are not sent on edit because
+    // the backend _patch_task does not handle them (they are dropped).
   } else {
     if (bodyVal.trim()) payload.body = bodyVal;
     if (statusVal) payload.status = statusVal;
@@ -2884,7 +2892,7 @@ async function addKanbanDependency(taskId){
   try {
     await api('/api/kanban/links' + _kanbanBoardQuery(), {
       method: 'POST',
-      body: JSON.stringify({parent: taskId, child: linkTo}),
+      body: JSON.stringify({parent_id: taskId, child_id: linkTo}),
     });
     if (input) input.value = '';
     await loadKanbanTask(taskId);
@@ -2894,9 +2902,9 @@ async function addKanbanDependency(taskId){
 async function removeKanbanDependency(taskId, linkId){
   if (!taskId || !linkId) return;
   try {
-    await api('/api/kanban/links' + _kanbanBoardQuery(), {
+    await api('/api/kanban/links/delete' + _kanbanBoardQuery(), {
       method: 'POST',
-      body: JSON.stringify({parent: taskId, child: linkId}),
+      body: JSON.stringify({parent_id: taskId, child_id: linkId}),
     });
     await loadKanbanTask(taskId);
   } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }

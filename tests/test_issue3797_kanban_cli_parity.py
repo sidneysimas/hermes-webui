@@ -81,11 +81,31 @@ class TestWorkspacePathValidation:
         assert "if (workspaceKind !== 'scratch')" in PANELS_JS
 
     def test_workspace_fields_sent_in_payload(self):
-        """The create/edit payload must include workspace_kind and workspace_path."""
+        """The create/edit payload must include workspace_kind and workspace_path on create only."""
         # In create branch (not isEdit)
         assert "payload.workspace_kind = workspaceKind" in PANELS_JS
         # Path is optional for non-create, but must be sent when present
         assert "if (workspacePathVal) payload.workspace_path = workspacePathVal" in PANELS_JS
+
+    def test_workspace_fields_not_sent_on_edit(self):
+        """submitKanbanTaskModal must NOT send workspace_kind/path when editing."""
+        # The edit branch should NOT set workspace_kind or workspace_path
+        # Verify this by checking that after isEdit check, workspace fields are only in else branch
+        assert "if (isEdit)" in PANELS_JS
+        # Check that workspace_kind is set in the else (create) branch
+        code = PANELS_JS
+        # Find the isEdit block and verify workspace fields are not in the true branch
+        edit_block = re.search(r'if \(isEdit\) \{[^}]*\}', code)
+        assert edit_block, "Could not find isEdit block"
+        assert "workspace_kind" not in edit_block.group(0), "workspace_kind should not be in edit branch"
+        assert "workspace_path" not in edit_block.group(0), "workspace_path should not be in edit branch"
+
+    def test_workspace_fields_disabled_when_editing(self):
+        """Modal must disable workspace fields when editing to prevent confusion."""
+        # The _kanbanSetTaskModalLabels function must disable fields during edit
+        assert "_kanbanSetTaskModalLabels" in PANELS_JS
+        assert "workspaceKindEl.disabled = true" in PANELS_JS
+        assert "workspacePathEl.disabled = true" in PANELS_JS
 
 
 class TestDependencyControls:
@@ -105,9 +125,9 @@ class TestDependencyControls:
         assert "async function addKanbanDependency" in PANELS_JS
         assert "'/api/kanban/links'" in PANELS_JS
         assert "method: 'POST'" in PANELS_JS
-        # Payload must have parent and child fields in the JSON
-        assert "{parent:" in PANELS_JS or '{"parent":' in PANELS_JS or "{parent :" in PANELS_JS
-        assert "child:" in PANELS_JS or '"child":' in PANELS_JS
+        # Payload must have parent_id and child_id fields in the JSON
+        assert "{parent_id:" in PANELS_JS or '{"parent_id":' in PANELS_JS or "{parent_id :" in PANELS_JS
+        assert "child_id:" in PANELS_JS or '"child_id":' in PANELS_JS
 
     def test_remove_dependency_function_exists(self):
         """removeKanbanDependency function must exist and hit /api/kanban/links POST."""
@@ -147,11 +167,14 @@ class TestAPIIntegration:
         assert "_kanbanBoardQuery()" in PANELS_JS
 
     def test_remove_dependency_deletes_via_post(self):
-        """removeKanbanDependency must POST to /api/kanban/links (not use DELETE)."""
-        # Check that removeKanbanDependency uses POST, not DELETE
-        # The backend handles both POST (to /api/kanban/links/delete or as POST to /api/kanban/links)
+        """removeKanbanDependency must POST to /api/kanban/links/delete."""
+        # Check that removeKanbanDependency POSTs to the correct delete endpoint
         assert "removeKanbanDependency" in PANELS_JS
+        assert "'/api/kanban/links/delete'" in PANELS_JS
         assert "method: 'POST'" in PANELS_JS
+        # Payload must have parent_id and child_id fields
+        assert "parent_id:" in PANELS_JS or '"parent_id":' in PANELS_JS
+        assert "child_id:" in PANELS_JS or '"child_id":' in PANELS_JS
 
     def test_links_refreshed_after_dependency_operation(self):
         """After adding or removing a dependency, loadKanbanTask must refresh the detail view."""
