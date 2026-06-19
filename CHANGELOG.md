@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.520] — 2026-06-19 — Release SE (recover from untracked-file update collisions)
+
+### Fixed
+
+- **An update blocked by an untracked-file collision now offers a recovery path instead of leaving the user stuck (#4310).** When `git pull` fails with "untracked working tree files would be overwritten by merge", the update response now flags the conflict so the UI surfaces the existing Force-update button (the normal path still destroys nothing). Force-update clears untracked colliders with `git clean -fd` (without `-x`, so ignored build/cache artifacts survive) before resetting, aborts before the hard reset if the clean fails, and its confirmation dialog now explicitly discloses that untracked files will be deleted. Thanks @rodboev.
+
 ## [v0.51.519] — 2026-06-19 — Release SD (reconcile stale active-run registry entries)
 
 ### Fixed
