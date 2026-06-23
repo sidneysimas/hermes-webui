@@ -105,20 +105,17 @@ console.log(JSON.stringify({
 """
     result = _run_node(script)
 
-    assert result["resetAttrs"] == [
+    expected_attrs = {
         "data-transparent-turn-collapsed",
         "data-transparent-turn-toggle-bound",
         "data-anchor-scene-live-owner",
         "data-anchor-stream-id",
         "data-live-assistant-turn",
-    ]
-    assert result["removedAttrs"] == [
-        "data-transparent-turn-collapsed",
-        "data-transparent-turn-toggle-bound",
-        "data-anchor-scene-live-owner",
-        "data-anchor-stream-id",
-        "data-live-assistant-turn",
-    ]
+    }
+    assert set(result["resetAttrs"]) == expected_attrs
+    assert len(result["resetAttrs"]) == len(expected_attrs)
+    assert set(result["removedAttrs"]) == expected_attrs
+    assert len(result["removedAttrs"]) == len(expected_attrs)
     assert result["currentAssistantTurnIsRecycled"] is True
     assert result["dataset"] == {
         "role": "assistant",

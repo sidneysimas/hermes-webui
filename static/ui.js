@@ -443,6 +443,7 @@ const _recycleResetAttrs=[
   'data-transparent-turn-toggle-bound',
   'data-anchor-scene-live-owner',
   'data-anchor-stream-id',
+  // Defensive reset for legacy/restored shells that may still carry the fallback live-turn marker.
   'data-live-assistant-turn',
 ];
 let _scrollbarDragActive=false;
