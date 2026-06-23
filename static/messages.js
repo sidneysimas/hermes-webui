@@ -2791,6 +2791,65 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     },null);
     return _findAnchorActivityEventByLocalId(localId,'reasoning');
   }
+  function _compactVisibleEchoText(value){
+    return String(value||'').replace(/\s+/g,'');
+  }
+  function _stripCompactEchoSuffix(value, suffix){
+    const raw=String(value||'');
+    const candidate=_compactVisibleEchoText(suffix);
+    if(!raw||!candidate) return {text:raw,removed:false};
+    const windowSize=Math.max(String(suffix||'').length*3,4096);
+    const offset=Math.max(0,raw.length-windowSize);
+    const tail=raw.slice(offset);
+    for(let idx=0;idx<=tail.length;idx+=1){
+      if(_compactVisibleEchoText(tail.slice(idx))===candidate){
+        return {text:raw.slice(0,offset+idx).trimEnd(),removed:true};
+      }
+    }
+    return {text:raw,removed:false};
+  }
+  function _stripAnchorReasoningEcho(visible){
+    const events=_anchorActivityEvents();
+    if(!events||!visible) return false;
+    for(let i=events.length-1;i>=0;i-=1){
+      const event=events[i];
+      if(!event||event.source_event_type!=='reasoning') continue;
+      const payload=(event.payload&&typeof event.payload==='object')?event.payload:{};
+      const rawText=String(payload.text||payload.reasoning||payload.thinking||'');
+      const stripped=_stripCompactEchoSuffix(rawText, visible);
+      if(!stripped.removed) continue;
+      const nextText=String(stripped.text||'').trim();
+      if(nextText){
+        _replaceAnchorActivityEventByLocalId(event.local_id,'reasoning',{
+          payload:{text:nextText},
+        });
+      }else{
+        events.splice(i,1);
+      }
+      _renderAnchorLiveScene();
+      return true;
+    }
+    return false;
+  }
+  function _stripLiveReasoningEcho(visible){
+    let removed=false;
+    const durable=_stripCompactEchoSuffix(reasoningText, visible);
+    if(durable.removed){
+      reasoningText=durable.text;
+      removed=true;
+    }
+    const live=_stripCompactEchoSuffix(liveReasoningText, visible);
+    if(live.removed){
+      liveReasoningText=live.text;
+      removed=true;
+    }
+    const anchorRemoved=_stripAnchorReasoningEcho(visible);
+    if(removed) syncInflightAssistantMessage();
+    if((removed||anchorRemoved)&&!String(liveReasoningText||'').trim()&&typeof removeThinking==='function'){
+      removeThinking();
+    }
+    return removed||anchorRemoved;
+  }
   function _flushReasoningToAnchor(){
     if(_anchorReasoningFlushed||!reasoningText) return;
     _anchorReasoningFlushed=true;
@@ -3777,9 +3836,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       const d=JSON.parse(e.data);
       const visible=String(d&&d.text?d.text:'').trim();
       const alreadyStreamed=!!(d&&d.already_streamed);
+      const reasoningEcho=!!(d&&d.reasoning_echo);
       if(!visible){
         return;
       }
+      if(reasoningEcho) _stripLiveReasoningEcho(visible);
       liveReasoningText='';
       if(alreadyStreamed){
         if(!S.session||S.session.session_id!==activeSid){
@@ -3799,7 +3860,6 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         _resetAssistantSegment();
         return;
       }
-      _applyToAnchor('interim_assistant',d,e);
       assistantText += assistantText ? `\n\n${visible}` : visible;
       visibleInterimSnippets.push(visible);
       syncInflightAssistantMessage();
@@ -3814,6 +3874,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _flushPendingSegmentRender({force:true});
       if(typeof finalizeThinkingCard==='function') finalizeThinkingCard();
       if(typeof closeCurrentLiveActivityGroup==='function') closeCurrentLiveActivityGroup();
+      _applyToAnchor('interim_assistant',d,e);
       // Collapse old interim notes once more than INTERIM_COLLAPSE_THRESHOLD accumulate.
       const INTERIM_COLLAPSE_THRESHOLD=3;
       if(visibleInterimSnippets.length>INTERIM_COLLAPSE_THRESHOLD&&assistantRow){

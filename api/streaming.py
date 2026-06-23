@@ -79,6 +79,20 @@ def _compact_for_echo_compare(value: str) -> str:
     return re.sub(r'\s+', '', str(value or ''))
 
 
+def _strip_compact_echo_suffix(value: str, suffix: str, *, search_window: int = 4096) -> tuple[str, bool]:
+    """Remove ``suffix`` from ``value`` when they match after whitespace folding."""
+    raw = str(value or '')
+    candidate = _compact_for_echo_compare(suffix)
+    if not raw or not candidate:
+        return raw, False
+    tail = raw[-max(len(str(suffix or '')) * 3, search_window):]
+    offset = len(raw) - len(tail)
+    for idx in range(len(tail) + 1):
+        if _compact_for_echo_compare(tail[idx:]) == candidate:
+            return raw[: offset + idx].rstrip(), True
+    return raw, False
+
+
 # Global lock for os.environ writes. Per-session locks (_agent_lock) prevent
 # concurrent runs of the SAME session, but two DIFFERENT sessions can still
 # interleave their os.environ writes. This global lock serializes the env
@@ -6375,6 +6389,38 @@ def _run_agent_streaming(
                 )
                 return bool(visible_tail and visible_tail.endswith(candidate))
 
+            def _strip_reasoning_output_echo(text: str) -> bool:
+                nonlocal _reasoning_segments
+                removed = False
+                if stream_id in STREAM_REASONING_TEXT:
+                    next_text, did_remove = _strip_compact_echo_suffix(
+                        STREAM_REASONING_TEXT.get(stream_id, ''),
+                        text,
+                    )
+                    if did_remove:
+                        STREAM_REASONING_TEXT[stream_id] = next_text
+                        removed = True
+                next_buffer, did_remove_buffer = _strip_compact_echo_suffix(_reasoning_buffer[0], text)
+                if did_remove_buffer:
+                    _reasoning_buffer[0] = next_buffer
+                    removed = True
+                for idx in (_current_reasoning_idx, _current_reasoning_idx - 1):
+                    if idx not in _reasoning_segments:
+                        continue
+                    next_segment, did_remove_segment = _strip_compact_echo_suffix(
+                        _reasoning_segments.get(idx, ''),
+                        text,
+                    )
+                    if not did_remove_segment:
+                        continue
+                    if next_segment:
+                        _reasoning_segments[idx] = next_segment
+                    else:
+                        _reasoning_segments.pop(idx, None)
+                    removed = True
+                    break
+                return removed
+
             def on_token(text):
                 nonlocal _token_sent
                 if text is None:
@@ -6448,11 +6494,15 @@ def _run_agent_streaming(
                 visible = str(text).strip()
                 if not visible:
                     return
+                reasoning_echo = _strip_reasoning_output_echo(visible)
                 already_streamed = bool(cb_kwargs.get('already_streamed', False)) or _is_visible_output_echo(visible)
-                put('interim_assistant', {
+                payload = {
                     'text': visible,
                     'already_streamed': already_streamed,
-                })
+                }
+                if reasoning_echo:
+                    payload['reasoning_echo'] = True
+                put('interim_assistant', payload)
 
             # Pre-initialise the activity counter here so on_tool (which
             # closes over it) never captures an unbound name even if this
