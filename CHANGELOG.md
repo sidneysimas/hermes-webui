@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+## [v0.51.657] — 2026-06-25 — Release XM (expanded shell tool cards show the full command)
+
+### Fixed
+
+- **Expanding a shell/terminal tool card now shows the full multi-line command, not just the first line.** In the transparent activity stream, a shell card's collapsed header correctly shows only the first line (compact metadata), but the expanded card reused that same first-line-only value — so a multi-line script still rendered as line 1 when you expanded it. The expanded detail lead now shows the complete command. As part of this, command redaction was broadened to mask common secret forms (env/colon assignments for `*TOKEN`/`*API_KEY`/`*SECRET`/`*ACCESS_KEY`/`*PRIVATE_KEY`/`*CREDENTIAL`/`*CLIENT_SECRET`/`*SESSION_KEY`/`*AUTH*`, `--token`/`--api-key`/`--secret`-style flags, `Authorization:` headers, and secret-looking URL query params) across the whole command, so exposing lines beyond the first never leaks a key. (#4926, part of #4925)
+
 ## [v0.51.656] — 2026-06-25 — Release XL (stream writeback timing diagnostics)
 
 ### Fixed
